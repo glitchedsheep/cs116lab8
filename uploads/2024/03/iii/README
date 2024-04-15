@@ -1,0 +1,14 @@
+Authors:               Rolando Ortega (rorteg02) Jason Singer (jsinge02)
+
+Acknowledgments:       N/A
+
+Implementation Notes:  
+                    uarray2: interface for 2D unboxed array
+                    bit2: interface for 2d bitmap
+                    
+                    sudoku: checks if a provided sudoku board is a valid 
+                            sudoku solution. 
+                    unblackedges: sucessfully identifies and changes all black
+                            edges in p1 formatted images to white pixels. 
+
+Time:                  20 hrs

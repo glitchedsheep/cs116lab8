@@ -1,0 +1,115 @@
+Authors:               Rolando Ortega (rorteg02) Jason Singer (jsinge02)
+
+Acknowledgments:       N/A
+
+Implementation Notes:  All extra credit options except flip-horinzontal         
+                        are implmeneted
+
+Architecture:
+The ppmtrans program first parses through input provided by the client, 
+including a type of transformation (including a way to map the file's data), 
+a file with an image, and an optional command to time the given transformation. 
+Any invalid commands or files that are given will result in the program 
+producing EXIT_FAILURE or throwing a checked runtime error. The program then 
+uses the pnm interface to create a Pnm_ppm object, which contains both a UArray2
+data structure containing the contents of the image and a pointer to a methods
+suite containing the different functions of UArray2 that are available to a 
+client. 
+
+Then, depending on the transformation command and the type of mapping that was 
+given, the program traverses the UArray2 and performs the transformation. This 
+is done by calling the mapping function in the methods suite that corresponds 
+to the provided mapping command, which also takes an apply function that alters
+the coordinates of each pixel from the image based on the given rotation. The 
+pixels with their new coordinates are stored in a destination UArray2. The 
+original array is then freed and replaced by the destination array in the 
+image's Pnm_ppm object, and the new image's contents are printed to standard 
+output for display.
+
+Before the transformation begins, a timer object is created and started to time
+how long the transformation takes. Once the transformation is complete, the 
+timer is stopped. If the time command with a corresponding time file were given
+by the client, the results from the timer are printed to the file, including the
+total time the transformation took as well as the time it took to transform an 
+individual pixel. 
+
+Finally, once the image is printed to standard output and the time results are 
+printed to the time file, the program frees any remaining memory and produces 
+an EXIT_SUCCESS code to complete the program. 
+
+
+Performance Measurement:
+    - Image Size: Height 6120 pixels, Width 8160 Pixels
+    - Computer Information:
+        - Model: 85
+        - Name: Intel(R) Xeon(R) Silver 4125Y CPU @ 2.20 GHz
+        - CPU Type: 6x86 CPU
+        - Clock rate: 2194.844 MHz 
+         
+            |    90 degrees     |    180 Degrees    |
+-----------------------------------------------------
+row-major   |  6093252480 ns    |  2495825137 ns    |
+            |   22.013418 ns/px |   49.977275 ns/px |
+-----------------------------------------------------
+col-major   |  4726372328 ns    |  8167657376 ns    |
+            |  94.642532 ns/px  |  163.552027 ns/px |
+-----------------------------------------------------
+block-major |  3674851879 ns    |  4931373093 ns    |  
+            |  73.586519 ns/px  |   98.747539 ns/px |
+
+
+Analysis of Results:
+90 Degrees:
+Row/Column Major:
+
+In a 90-degree rotation, the rows of the original image are mapped to the 
+columns of the destination, and vice versa. That means that whether row mapping
+or column mapping is used, in the destination image (for row mapping) and 
+source image (for column mapping), full columns will have to be processed every 
+time a row is mapped through. The Uarray2 interface stores rows continuously, 
+but adjacent column indices are not at all adjacent in the memory, which means
+that both processes will have poor locality for the column processing that is 
+necessary for these rotations. Thus, both row-major and column-major access 
+will have a low cache hit rate.
+
+Block Major:
+In a 90 degree rotation, rows are mapped to columns and vice versa. However, 
+in block mapping, the blocks are being rotated individually regardless of their
+columns and rows. The rows and columns within a block are all continuous to 
+each other in memory, so the locality for rotating the blocks themselves and 
+the contents of each block should be relatively good. However, the blocks 
+themselves are not continuous in memory, so when switching between which block 
+is being mapped, the cache hit rate will be low. In the grand scheme of 
+things, as there are far fewer blocks than pixels, the lower cache hit rate is
+massively reduced when compared to the column processing of row and 
+column-major.
+
+180 degrees:
+Row major: In the UArray2, rows are stored congruently in memory, and in a 
+180-degree rotation, rows in the source image directly map to rows in the 
+destination image. This means that throughout the entire rotation process, only
+rows need to be processed, and as stated before, rows are stored concurrently 
+in memory. This means that there is a high level of locality throughout the 
+entire process, and thus there should be a very low cache miss rate. Because
+of this, row-major access will have the best cache hit rate on a 180-degree 
+rotation. 
+
+Col major: Conversely, columns map to columns in a 180-degree rotation, and 
+columns are not stored congruently in memory in the UArray2 implementation. 
+For each column processed in the column-major access in the source image, a 
+corresponding column will have to be processed in the destination, both of 
+which will have extremely poor locality and thus a very low cache hit rate. 
+Col major access on a 180-degree rotation should perform the worst out of 
+every option on every rotation in regards to cache hit rate
+
+Block major: Since block major maps between blocks, rather than columns and 
+rows, the high cache hit rate of row access and low hit rate of column access 
+are ignored as the blocks themselves are what are being rotated, while the 
+contents of each blocks are always stored congruently in memory. Unlike row 
+access, where the rows themselves are also stored congruently in memory, the 
+block in our implementation will not be congruent in memory, so when switching 
+between blocks to map through, the locality will be low. Once again however, 
+there are far fewer blocks than pixels, so overall locality and cache hit rate 
+will be relatively high, although not as high as row-mapping in this case.
+
+Time: 30 hours 

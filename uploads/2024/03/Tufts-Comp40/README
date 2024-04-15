@@ -1,0 +1,123 @@
+------------README-------------------------------------------------------------
+
+Author: Isabelle Bain
+Date: 3/9/2022
+CS 40, Arith
+
+------------PURPOSE------------------------------------------------------------
+
+This program compresses or decompresses a given file, printing the results to
+standard output. The compression program takes in a ppm and compresses each 
+2x2 block of pixels into a 32-bit word (the width/height may be trimmed to 
+accommodate for this). The decompression program takes in a compressed image 
+files and writes it to standard output as a ppm. 
+
+------------ARCHITECTURE-------------------------------------------------------
+
+The design of this project included several different files that each handled 
+a part of the project. 
+
+First I compress by reading in a ppm from the user, then convert it to
+a floating-point RGB representation before turning it into a component video
+image. This first step is done in the componentIMG interface. The next step 
+involves transforming the component video image into a blocked image where 
+each 2x2 block of pixels of the component video image corresponds to a single
+element of the blocked image. I used the discrete cosine transformation to 
+get a, b, c, and d from the component video's Y data, and I also took 
+the mean of PB and PR. I then took this data stored in the blocked image and 
+quantized it into scaled integers. The component to blocked to quantized 
+transformation occurs in the quantizedIMG interface. Finally, the compressedIMG
+interface deals with bitpacking the quantized image's data into an compressed
+image, where each pixel is a 32-bit word containing the corresponding quantized
+pixel information. The resulting compressed image gets printed out using 
+a print function also found in the compressedIMG interface, and the resulting 
+image is around 1/3 the size of the original image.
+
+Then, I decompress by reading in a compressed file from the user and storing it
+into a compressed image. By doing the same transformations in reverse, I  
+convert the compressed image into a quantized, blocked, component video, 
+floating-point, and finally a ppm that gets printed out to the user.
+
+
+40image.c - Driver file for the overall compression/decompression program. 
+Contains a main function that reads in command line arguments, determines 
+whether the provided file should be compressed or decompressed, and opens the 
+file, passing it into the appropriate function in compress40.c. Closes the 
+file after the compression/decompression is complete.
+
+compress40.c - the compress40.c file contains two functions that contain the 
+overall flow of transformations for compression and decompression. For 
+compression, I first read in the PPM and transform it into a component video 
+image (using the compressedIMG interface). I then transform that into a 
+quantized version of the image (quantizedIMG interface), before finally 
+transforming that to the compressed bitpacked image (compressedIMG), and 
+printing that to standard output. The decompression involves the same steps, 
+but in reverse, read in compressed image -> quantized -> component video -> 
+PPM. Note that I do have intermediate private transformations within each of 
+these transformation interfaces which will be discussed further in each 
+interface's description.
+
+componentIMG.h - interface for the PPM <-> component video transformation. 
+Contains a floating-point image and component video image struct based on 
+Pnm_ppm - they both contain the width and height, methods, pixel map, and 
+denominator (only in the floating-point image struct). The pixel maps are 
+each a UArray2b with each element pointing to a pixel struct - the
+floating-point's containing RGB values, and the component video's containing 
+Y/PB/PR values. Interface contains functions that take in a PPM or component 
+video image, transform it to a floating-point representation, and then 
+transform that into a component video or PPM image respectively.
+
+componentIMG.c - implementation of the componentIMG interface, which uses the 
+structs declared to convert between a PPM, a floating-point rgb image, and a 
+component video image in either direction. The conversion between PPM and cv 
+is done using 2 intermediate map functions, one that goes from the original 
+type to a floating-point image, and one that goes from the floating-point image
+to the desired final version. Each apply function uses a helper function that 
+goes from one type of pixel to another for modularity's sake. 
+
+quantizedIMG.h - interface for the cv <-> quantized image transformation. 
+Contains a blocked image and quantized image struct based on 
+Pnm_ppm - they both contain the width and height, methods, and pixel map.
+The pixel maps are each a UArray2b with each element pointing to a pixel 
+struct - both containing a, b, c, d, pb, and pr values, the blocked's are pre 
+quantization and the quantized are post. Interface contains functions that take
+in a component video image or a quantized image, transform it to a blocked 
+representation, and then transform that into a quantized or cv image 
+respectively.
+
+quantizedIMG.c - implementation of the quantizedIMG interface, which uses the 
+structs declared to convert between a cv image, a blocked image, and a 
+quantized image in either direction. The conversion between cv and quantized 
+is done using 2 intermediate map functions, one that goes from the original 
+type to a blocked image, and one that goes from the blocked image
+to the desired final version. Each apply function uses a helper function that 
+goes from one type of pixel to another for modularity's sake.
+
+compressedIMG.h - interface for the quantized <-> compressed image 
+transformation. Contains a compressed image struct based on 
+Pnm_ppm - it contains width and height, methods, and a pixel map which is a 
+UArray2b with each element pointing to a uint64_t representing a single word. 
+Interface contains functions that take in a quantized image or a compressed 
+image, and transform that into a compressed or quantized image respectively.
+
+compressedIMG.c - implementation of the compressedIMG interface, which uses the
+struct declared to convert between a quantized image and a compressed image, 
+and can read in a compressed image from the user as well as print one out to 
+standard input. The conversion between a compressed image and a quantized image
+is done using an intermediate map function uses a helper function which uses 
+the bitpacking interface to pack and unpack quantized structs into bitpacked 
+words and vice-versa. 
+
+bitpack.c - the bitpack design follows the spec implementation, with the 
+addition of a right and left shift function each for signed and unsigned words.
+These shifts differ from merely shifting because if the provided shift is 
+larger than 64, I decided that should wipe the number and return 0. Otherwise,
+I implemented each function in the provided .h file, and decided to implement
+signed and unsigned functions so they are unaware of each other 
+
+ppmdiff.c - the ppm design follows the lab spec implementation. it takes in 2
+images and ensures that they differ by a max of 1 pixel in either height or
+width, and then maps over both and compares the respective pixels. it calculates
+the difference between them and then returns the overall sum of that difference
+to standard output. 
+
